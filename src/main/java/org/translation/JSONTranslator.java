@@ -1,13 +1,13 @@
 package org.translation;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.*;
 
 /**
  * An implementation of the Translator interface which reads in the translation
@@ -15,7 +15,7 @@ import org.json.JSONArray;
  */
 public class JSONTranslator implements Translator {
 
-    // TODO Task: pick appropriate instance variables for this class
+    private final Map<String, Map<String, String>> countryTranslations;
 
     /**
      * Constructs a JSONTranslator using data from the sample.json resources file.
@@ -26,43 +26,84 @@ public class JSONTranslator implements Translator {
 
     /**
      * Constructs a JSONTranslator populated using data from the specified resources file.
+     *
      * @param filename the name of the file in resources to load the data from
      * @throws RuntimeException if the resource file can't be loaded properly
      */
     public JSONTranslator(String filename) {
-        // read the file to get the data to populate things...
-        try {
+        countryTranslations = new HashMap<>();
 
-            String jsonString = Files.readString(Paths.get(getClass().getClassLoader().getResource(filename).toURI()));
+        // Read the file to get the data to populate things...
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filename);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+
+            if (inputStream == null) {
+                throw new RuntimeException("Resource file '" + filename + "' not found.");
+            }
+
+            StringBuilder jsonStringBuilder = new StringBuilder();
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                jsonStringBuilder.append(line);
+            }
+
+            String jsonString = jsonStringBuilder.toString();
 
             JSONArray jsonArray = new JSONArray(jsonString);
 
-            // TODO Task: use the data in the jsonArray to populate your instance variables
-            //            Note: this will likely be one of the most substantial pieces of code you write in this lab.
+            // Use the data in the jsonArray to populate your instance variables
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject countryObject = jsonArray.getJSONObject(i);
 
-        }
-        catch (IOException | URISyntaxException ex) {
-            throw new RuntimeException(ex);
+                // Get the country code from "alpha3"
+                String countryCode = countryObject.getString("alpha3").toLowerCase();
+
+                Map<String, String> languageMap = new HashMap<>();
+
+                // Iterate over the keys to get language codes and translations
+                for (String key : countryObject.keySet()) {
+                    if (!key.equals("id") && !key.equals("alpha2") && !key.equals("alpha3")) {
+                        String languageCode = key.toLowerCase();
+                        String translation = countryObject.getString(key);
+                        languageMap.put(languageCode, translation);
+                    }
+                }
+
+                countryTranslations.put(countryCode, languageMap);
+            }
+
+        } catch (IOException ex) {
+            throw new RuntimeException("Error reading translations from " + filename, ex);
         }
     }
 
     @Override
     public List<String> getCountryLanguages(String country) {
-        // TODO Task: return an appropriate list of language codes,
-        //            but make sure there is no aliasing to a mutable object
-        return new ArrayList<>();
+        Map<String, String> languageMap = countryTranslations.get(country.toLowerCase());
+
+        if (languageMap == null) {
+            return new ArrayList<>();
+        }
+
+        // Return a copy to avoid aliasing
+        return new ArrayList<>(languageMap.keySet());
     }
 
     @Override
     public List<String> getCountries() {
-        // TODO Task: return an appropriate list of country codes,
-        //            but make sure there is no aliasing to a mutable object
-        return new ArrayList<>();
+        // Return a copy to avoid aliasing
+        return new ArrayList<>(countryTranslations.keySet());
     }
 
     @Override
     public String translate(String country, String language) {
-        // TODO Task: complete this method using your instance variables as needed
-        return null;
+        Map<String, String> languageMap = countryTranslations.get(country.toLowerCase());
+
+        if (languageMap == null) {
+            return null;
+        }
+
+        return languageMap.get(language.toLowerCase());
     }
 }

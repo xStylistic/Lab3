@@ -1,31 +1,31 @@
 package org.translation;
 
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 /**
  * Main class for this program.
- * Complete the code according to the "to do" notes.<br/>
- * The system will:<br/>
- * - prompt the user to pick a country name from a list<br/>
- * - prompt the user to pick the language they want it translated to from a list<br/>
- * - output the translation<br/>
- * - at any time, the user can type quit to quit the program<br/>
+ * The system will:
+ * - prompt the user to pick a country name from a list
+ * - prompt the user to pick the language they want it translated to from a list
+ * - output the translation
+ * - at any time, the user can type quit to quit the program
  */
 public class Main {
 
+    private static final String QUIT = "quit";
+    private static final CountryCodeConverter countryCodeConverter = new CountryCodeConverter();
+    private static final LanguageCodeConverter languageCodeConverter = new LanguageCodeConverter();
+
     /**
-     * This is the main entry point of our Translation System!<br/>
+     * This is the main entry point of our Translation System!
      * A class implementing the Translator interface is created and passed into a call to runProgram.
+     *
      * @param args not used by the program
      */
     public static void main(String[] args) {
 
-        // TODO Task: once you finish the JSONTranslator,
-        //            you can use it here instead of the InLabByHandTranslator
-        //            to try out the whole program!
-        // Translator translator = new JSONTranslator(null);
-        Translator translator = new InLabByHandTranslator();
+        // Using JSONTranslator to try out the whole program
+        Translator translator = new JSONTranslator();
 
         runProgram(translator);
     }
@@ -34,65 +34,127 @@ public class Main {
      * This is the method which we will use to test your overall program, since
      * it allows us to pass in whatever translator object that we want!
      * See the class Javadoc for a summary of what the program will do.
+     *
      * @param translator the Translator implementation to use in the program
      */
     public static void runProgram(Translator translator) {
         while (true) {
-            String country = promptForCountry(translator);
-            // TODO CheckStyle: The String "quit" appears 3 times in the file.
-            // TODO Checkstyle: String literal expressions should be on the left side of an equals comparison
-            if (country.equals("quit")) {
+            String countryName = promptForCountry(translator);
+            if (QUIT.equalsIgnoreCase(countryName)) {
                 break;
             }
-            // TODO Task: Once you switch promptForCountry so that it returns the country
-            //            name rather than the 3-letter country code, you will need to
-            //            convert it back to its 3-letter country code when calling promptForLanguage
-            String language = promptForLanguage(translator, country);
-            if (language.equals("quit")) {
+
+            String countryCode = countryCodeConverter.fromCountry(countryName);
+            if (countryCode == null) {
+                System.out.println("Error: Country code not found for " + countryName);
+                continue;
+            }
+
+            String languageName = promptForLanguage(translator, countryCode);
+            if (QUIT.equalsIgnoreCase(languageName)) {
                 break;
             }
-            // TODO Task: Once you switch promptForLanguage so that it returns the language
-            //            name rather than the 2-letter language code, you will need to
-            //            convert it back to its 2-letter language code when calling translate.
-            //            Note: you should use the actual names in the message printed below though,
-            //            since the user will see the displayed message.
-            System.out.println(country + " in " + language + " is " + translator.translate(country, language));
-            System.out.println("Press enter to continue or quit to exit.");
+
+            String languageCode = languageCodeConverter.fromLanguage(languageName);
+            if (languageCode == null) {
+                System.out.println("Error: Language code not found for " + languageName);
+                continue;
+            }
+
+            String translation = translator.translate(countryCode, languageCode);
+            if (translation == null) {
+                System.out.println("Translation not available.");
+            } else {
+                System.out.println(countryName + " in " + languageName + " is " + translation);
+            }
+
+            System.out.println("Press enter to continue or type 'quit' to exit.");
             Scanner s = new Scanner(System.in);
             String textTyped = s.nextLine();
 
-            if ("quit".equals(textTyped)) {
+            if (QUIT.equalsIgnoreCase(textTyped.trim())) {
                 break;
             }
         }
     }
 
-    // Note: CheckStyle is configured so that we don't need javadoc for private methods
     private static String promptForCountry(Translator translator) {
-        List<String> countries = translator.getCountries();
-        // TODO Task: replace the following println call, sort the countries alphabetically,
-        //            and print them out; one per line
-        //      hint: class Collections provides a static sort method
-        // TODO Task: convert the country codes to the actual country names before sorting
-        System.out.println(countries);
+        List<String> countryCodes = translator.getCountries();
 
-        System.out.println("select a country from above:");
+        // Convert country codes to country names and sort them
+        List<String> countryNames = new ArrayList<>();
+        Map<String, String> nameToCodeMap = new HashMap<>();
+
+        for (String code : countryCodes) {
+            String name = countryCodeConverter.fromCountryCode(code);
+            if (name != null) {
+                countryNames.add(name);
+                nameToCodeMap.put(name, code);
+            }
+        }
+
+        Collections.sort(countryNames);
+
+        // Print the country names
+        for (String name : countryNames) {
+            System.out.println(name);
+        }
+
+        System.out.println("Select a country from above (or type 'quit' to exit):");
 
         Scanner s = new Scanner(System.in);
-        return s.nextLine();
+        String input = s.nextLine().trim();
 
+        if (QUIT.equalsIgnoreCase(input)) {
+            return QUIT;
+        }
+
+        if (!nameToCodeMap.containsKey(input)) {
+            System.out.println("Invalid country. Please try again.");
+            return promptForCountry(translator);
+        }
+
+        return input;
     }
 
-    // Note: CheckStyle is configured so that we don't need javadoc for private methods
-    private static String promptForLanguage(Translator translator, String country) {
+    private static String promptForLanguage(Translator translator, String countryCode) {
 
-        // TODO Task: replace the line below so that we sort the languages alphabetically and print them out; one per line
-        // TODO Task: convert the language codes to the actual language names before sorting
-        System.out.println(translator.getCountryLanguages(country));
+        // Get the list of language codes for the country
+        List<String> languageCodes = translator.getCountryLanguages(countryCode);
 
-        System.out.println("select a language from above:");
+        // Convert language codes to language names and sort them
+        List<String> languageNames = new ArrayList<>();
+        Map<String, String> nameToCodeMap = new HashMap<>();
+
+        for (String code : languageCodes) {
+            String name = languageCodeConverter.fromLanguageCode(code);
+            if (name != null) {
+                languageNames.add(name);
+                nameToCodeMap.put(name, code);
+            }
+        }
+
+        Collections.sort(languageNames);
+
+        // Print the language names
+        for (String name : languageNames) {
+            System.out.println(name);
+        }
+
+        System.out.println("Select a language from above (or type 'quit' to exit):");
 
         Scanner s = new Scanner(System.in);
-        return s.nextLine();
+        String input = s.nextLine().trim();
+
+        if (QUIT.equalsIgnoreCase(input)) {
+            return QUIT;
+        }
+
+        if (!nameToCodeMap.containsKey(input)) {
+            System.out.println("Invalid language. Please try again.");
+            return promptForLanguage(translator, countryCode);
+        }
+
+        return input;
     }
 }
