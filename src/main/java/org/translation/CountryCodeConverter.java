@@ -1,10 +1,11 @@
 package org.translation;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,8 +13,10 @@ import java.util.Map;
  */
 public class CountryCodeConverter {
 
-    private final Map<String, String> codeToName = new HashMap<>();
-    private final Map<String, String> nameToCode = new HashMap<>();
+    private static final int EXPECTED_PARTS_LENGTH = 4;
+
+    private final Map<String, String> codeToCountryMap = new HashMap<>();
+    private final Map<String, String> countryToCodeMap = new HashMap<>();
 
     /**
      * Default constructor which will load the country codes from "country-codes.txt"
@@ -31,42 +34,29 @@ public class CountryCodeConverter {
      */
     public CountryCodeConverter(String filename) {
 
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filename);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(getClass()
+                    .getClassLoader().getResource(filename).toURI()));
 
-            String line;
-            boolean isFirstLine = true; // Skip header line
-
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-
-                // Skip empty lines or comment lines
-                if (line.isEmpty()) {
-                    continue;
-                }
-
-                // Skip header line
+            // Skip the header line if present
+            boolean isFirstLine = true;
+            for (String line : lines) {
                 if (isFirstLine) {
                     isFirstLine = false;
                     continue;
                 }
-
-                // Split the line on tab character
                 String[] parts = line.split("\t");
-
-                if (parts.length >= 4) {
-                    String countryName = parts[0].trim();
+                if (parts.length >= EXPECTED_PARTS_LENGTH) {
+                    String country = parts[0].trim();
                     String alpha3Code = parts[2].trim().toLowerCase();
-
-                    if (!countryName.isEmpty() && !alpha3Code.isEmpty()) {
-                        codeToName.put(alpha3Code, countryName);
-                        nameToCode.put(countryName, alpha3Code);
-                    }
+                    codeToCountryMap.put(alpha3Code, country);
+                    countryToCodeMap.put(country.toLowerCase(), alpha3Code);
                 }
             }
 
-        } catch (IOException ex) {
-            throw new RuntimeException("Error reading country codes from " + filename, ex);
+        }
+        catch (IOException | URISyntaxException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
@@ -77,10 +67,7 @@ public class CountryCodeConverter {
      * @return the name of the country corresponding to the code
      */
     public String fromCountryCode(String code) {
-        if (code == null) {
-            return null;
-        }
-        return codeToName.get(code.trim().toLowerCase());
+        return codeToCountryMap.getOrDefault(code.toLowerCase(), "Unknown code");
     }
 
     /**
@@ -90,10 +77,7 @@ public class CountryCodeConverter {
      * @return the 3-letter code of the country
      */
     public String fromCountry(String country) {
-        if (country == null) {
-            return null;
-        }
-        return nameToCode.get(country.trim());
+        return countryToCodeMap.getOrDefault(country.toLowerCase(), "Unknown country");
     }
 
     /**
@@ -102,6 +86,6 @@ public class CountryCodeConverter {
      * @return how many countries are included in this code converter.
      */
     public int getNumCountries() {
-        return codeToName.size();
+        return codeToCountryMap.size();
     }
 }

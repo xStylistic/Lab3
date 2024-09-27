@@ -9,8 +9,8 @@ import java.util.List;
  */
 public class InLabByHandTranslator implements Translator {
 
+    // TODO Checkstyle: Static variable definition in correct order now
     public static final String CANADA = "can";
-    public static final String USA = "usa";
 
     /**
      * Returns the language abbreviations for all languages whose translations are
@@ -22,9 +22,7 @@ public class InLabByHandTranslator implements Translator {
     @Override
     public List<String> getCountryLanguages(String country) {
         if (CANADA.equals(country)) {
-            return new ArrayList<>(List.of("de", "en", "es", "fr", "zh"));
-        } else if (USA.equals(country)) {
-            return new ArrayList<>(List.of("en", "es"));
+            return new ArrayList<>(List.of("de", "en", "zh", "es", "fr"));
         }
         return new ArrayList<>();
     }
@@ -37,7 +35,7 @@ public class InLabByHandTranslator implements Translator {
      */
     @Override
     public List<String> getCountries() {
-        return new ArrayList<>(List.of(CANADA, USA));
+        return new ArrayList<>(List.of(CANADA));
     }
 
     /**
@@ -49,28 +47,19 @@ public class InLabByHandTranslator implements Translator {
      */
     @Override
     public String translate(String country, String language) {
-
-        String translation = null;
-
-        if (CANADA.equals(country)) {
-            if ("de".equals(language)) {
-                translation = "Kanada";
-            } else if ("en".equals(language)) {
-                translation = "Canada";
-            } else if ("es".equals(language)) {
-                translation = "Canadá";
-            } else if ("fr".equals(language)) {
-                translation = "Canada";
-            } else if ("zh".equals(language)) {
-                translation = "加拿大";
-            }
-        } else if (USA.equals(country)) {
-            if ("en".equals(language)) {
-                translation = "United States";
-            } else if ("es".equals(language)) {
-                translation = "Estados Unidos";
-            }
+        if (!CANADA.equals(country)) {
+            return null;
         }
+
+        // Using switch expression to reduce return count to 2
+        String translation = switch (language) {
+            case "de" -> "Kanada";
+            case "en" -> "Canada";
+            case "zh" -> "加拿大";
+            case "es" -> "Canadá";
+            case "fr" -> "Canada";
+            default -> null;
+        };
 
         return translation;
     }

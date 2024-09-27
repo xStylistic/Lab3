@@ -1,13 +1,16 @@
 package org.translation;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.*;
 
 /**
  * An implementation of the Translator interface which reads in the translation
@@ -15,7 +18,8 @@ import java.util.*;
  */
 public class JSONTranslator implements Translator {
 
-    private final Map<String, Map<String, String>> countryTranslations;
+    // Instance variables to store the country and language mapping
+    private final Map<String, Map<String, String>> countryTranslations = new HashMap<>();
 
     /**
      * Constructs a JSONTranslator using data from the sample.json resources file.
@@ -31,79 +35,113 @@ public class JSONTranslator implements Translator {
      * @throws RuntimeException if the resource file can't be loaded properly
      */
     public JSONTranslator(String filename) {
-        countryTranslations = new HashMap<>();
+        try {
+            String jsonString = Files.readString(
+                    Paths.get(getClass().getClassLoader().getResource(filename).toURI())
+            );
+            parseJSONData(new JSONArray(jsonString));
 
-        // Read the file to get the data to populate things...
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filename);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-
-            if (inputStream == null) {
-                throw new RuntimeException("Resource file '" + filename + "' not found.");
-            }
-
-            StringBuilder jsonStringBuilder = new StringBuilder();
-            String line;
-
-            while ((line = reader.readLine()) != null) {
-                jsonStringBuilder.append(line);
-            }
-
-            String jsonString = jsonStringBuilder.toString();
-
-            JSONArray jsonArray = new JSONArray(jsonString);
-
-            // Use the data in the jsonArray to populate your instance variables
-            for (int i = 0; i < jsonArray.length(); i++) {
-                JSONObject countryObject = jsonArray.getJSONObject(i);
-
-                // Get the country code from "alpha3"
-                String countryCode = countryObject.getString("alpha3").toLowerCase();
-
-                Map<String, String> languageMap = new HashMap<>();
-
-                // Iterate over the keys to get language codes and translations
-                for (String key : countryObject.keySet()) {
-                    if (!key.equals("id") && !key.equals("alpha2") && !key.equals("alpha3")) {
-                        String languageCode = key.toLowerCase();
-                        String translation = countryObject.getString(key);
-                        languageMap.put(languageCode, translation);
-                    }
-                }
-
-                countryTranslations.put(countryCode, languageMap);
-            }
-
-        } catch (IOException ex) {
-            throw new RuntimeException("Error reading translations from " + filename, ex);
+        }
+        catch (IOException | URISyntaxException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
+    /**
+     * Parses the JSON data and populates the countryTranslations map.
+     *
+     * @param jsonArray The JSONArray containing country data
+     */
+    private void parseJSONData(JSONArray jsonArray) {
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONObject countryObject = jsonArray.getJSONObject(i);
+            String countryCode = countryObject.optString("alpha3");
+
+            if (isValidCountryCode(countryCode)) {
+                countryTranslations.put(countryCode.toLowerCase(), getTranslations(countryObject));
+            }
+        }
+    }
+
+    /**
+     * Checks if a country code is valid (non-null and non-empty).
+     *
+     * @param countryCode The country code to check
+     * @return true if valid, false otherwise
+     */
+    private boolean isValidCountryCode(String countryCode) {
+        return countryCode != null && !countryCode.isEmpty();
+    }
+
+    /**
+     * Extracts translations from a given JSONObject, skipping non-language keys.
+     *
+     * @param countryObject The JSONObject containing country data
+     * @return A map of language codes to translations
+     */
+    private Map<String, String> getTranslations(JSONObject countryObject) {
+        Map<String, String> translations = new HashMap<>();
+        for (String key : countryObject.keySet()) {
+            if (isLanguageKey(key)) {
+                Object value = countryObject.get(key);
+                if (value instanceof String) {
+                    translations.put(key, (String) value);
+                }
+            }
+        }
+        return translations;
+    }
+
+    /**
+     * Determines if a key is a valid language key (not a country-related key).
+     *
+     * @param key The key to check
+     * @return true if it is a language key, false otherwise
+     */
+    private boolean isLanguageKey(String key) {
+        return !"id".equals(key) && !"alpha2".equals(key) && !"alpha3".equals(key) && !"numeric".equals(key);
+    }
+
+    /**
+     * Returns the language abbreviations for all languages whose translations are
+     * available for the given country.
+     *
+     * @param country The country code (alpha3)
+     * @return List of language abbreviations available for this country
+     */
     @Override
     public List<String> getCountryLanguages(String country) {
-        Map<String, String> languageMap = countryTranslations.get(country.toLowerCase());
-
-        if (languageMap == null) {
+        Map<String, String> translations = countryTranslations.get(country.toLowerCase());
+        if (translations == null) {
             return new ArrayList<>();
         }
-
-        // Return a copy to avoid aliasing
-        return new ArrayList<>(languageMap.keySet());
+        return new ArrayList<>(translations.keySet());
     }
 
+    /**
+     * Returns the country abbreviations for all countries whose translations are
+     * available from this Translator.
+     *
+     * @return List of country abbreviations
+     */
     @Override
     public List<String> getCountries() {
-        // Return a copy to avoid aliasing
         return new ArrayList<>(countryTranslations.keySet());
     }
 
+    /**
+     * Returns the name of the country based on the specified country abbreviation and language abbreviation.
+     *
+     * @param country  The country code (alpha3)
+     * @param language The language code (alpha2)
+     * @return The name of the country in the given language or null if no translation is available
+     */
     @Override
     public String translate(String country, String language) {
-        Map<String, String> languageMap = countryTranslations.get(country.toLowerCase());
-
-        if (languageMap == null) {
+        Map<String, String> translations = countryTranslations.get(country.toLowerCase());
+        if (translations == null) {
             return null;
         }
-
-        return languageMap.get(language.toLowerCase());
+        return translations.getOrDefault(language, null);
     }
 }
